@@ -9,7 +9,7 @@ class ExceptionHandler {
         Log.d(LOG_TAG, getStackTrace(ex));
     }
 
-    private static String getStackTrace(Exception ex) {
+    private String getStackTrace(Exception ex) {
         StringBuilder sb = new StringBuilder(500);
         StackTraceElement[] st = ex.getStackTrace();
         sb.append(ex.getClass().getName()).append(": ").append(ex.getMessage()).append("\n");
