@@ -4,6 +4,7 @@ import android.net.Uri;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.database.Cursor;
+import android.util.Log;
 import android.view.View;
 
 import org.json.JSONArray;
@@ -15,6 +16,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
+import static ru.gal20040.smsbackuper.ExceptionHandler.LOG_TAG;
 import static ru.gal20040.smsbackuper.SmsField.getSmsField;
 
 /*{
@@ -74,22 +76,32 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void GetSMSList(View v){
+        JsonObjectFiller smsBackup;
         Uri uriSms = Uri.parse("content://sms/");
         Cursor cursor = this.getContentResolver().query(uriSms, null, null, null, null);
         startManagingCursor(cursor);
-        if (cursor != null && cursor.getCount() > 0) {
-            parseSmsListToJsonObject(cursor);
-            cursor.close();
+        if (cursor == null || cursor.getCount() <= 0) { return; }
+
+        smsBackup = new JsonObjectFiller();
+        parseSmsListToJsonObject(cursor, smsBackup);
+        cursor.close();
+
+        if (smsBackup.getJsonObject().length() > 0) {
+            try {
+                ReaderWriter readerWriter = new ReaderWriter();
+                String response = readerWriter.writeFileSD("sms_backup", "sms_backup_json.txt",
+                        smsBackup.getJsonObject().toString(3));
+                Log.d(LOG_TAG, response);
+            } catch (JSONException e) {
+                ExceptionHandler exceptionHandler = new ExceptionHandler();
+                exceptionHandler.errorAction(e);
+            }
         }
     }
 
-    private void parseSmsListToJsonObject(Cursor cursor) {
-        if (cursor == null
-                || cursor.getCount() <= 0) {
-            return;
-        }
+    private void parseSmsListToJsonObject(Cursor cursor, JsonObjectFiller smsBackup) {
+        if (cursor == null || cursor.getCount() <= 0) { return; }
 
-        JsonObjectFiller smsBackup = new JsonObjectFiller();
         JSONArray defaultFieldTypes = new JSONArray();
         JSONArray smsArray = new JSONArray();
 
@@ -106,17 +118,9 @@ public class MainActivity extends AppCompatActivity {
 
     //todo подумать, как не перепутать между собой два JSONArray.
     private void fillUpSmsArray(Cursor cursor, JSONArray defaultFieldTypes, JSONArray smsArray) {
-        if (cursor == null
-                || cursor.getCount() <= 0) {
-            return;
-        }
-
         short smsCounter_zeroBased = 0;
-        int columnIndex;
-        String[] strArray;
-        SmsFieldType smsFieldType;
+        String fieldName;
 
-        JsonObjectFiller currentField;
         Map<String, SmsFieldType> defaultFieldTypesMap =
                 new HashMap<>(); //только для быстрой проверки наличия поля с нужным типом в JSONArray defaultFieldTypes.
 
@@ -124,29 +128,25 @@ public class MainActivity extends AppCompatActivity {
         JSONArray currentSmsOtherFields;
         JSONArray currentSmsFieldTypes;
 
-        do {
+        while(cursor.moveToNext()) {
             currentSms = new JsonObjectFiller();
             currentSms.addNewJSONObject("smsCounter_zeroBased", smsCounter_zeroBased);
 
             currentSmsOtherFields = new JSONArray();
             currentSmsFieldTypes = new JSONArray();
 
-            strArray = cursor.getColumnNames();
-            for (String fieldName : strArray) {
-                currentField = new JsonObjectFiller();
-                columnIndex = cursor.getColumnIndex(fieldName);
+            for (int columnIndex = 0; columnIndex < cursor.getColumnCount(); columnIndex++) {
+                fieldName = cursor.getColumnName(columnIndex);
 
                 SmsField smsField = getSmsField(cursor, columnIndex);
-                smsFieldType = smsField.smsFieldType;
-                //заполняем defaultFieldTypes/currentSmsFieldTypes
-                processCurrentFieldType(defaultFieldTypesMap, fieldName, smsFieldType, defaultFieldTypes, currentSmsFieldTypes);
 
-                currentField.addNewJSONObject(fieldName, smsField.smsFieldValue);
-                defaultFieldTypes.put(currentField.jsonObject);
+                //заполняем defaultFieldTypes/currentSmsFieldTypes
+                processCurrentFieldType(defaultFieldTypesMap,
+                        fieldName, smsField.smsFieldType,
+                        defaultFieldTypes, currentSmsFieldTypes);
 
                 //заполняем smsArray
-                getFieldValue(cursor);
-                currentSms.addNewJSONObject(fieldName, fieldName); //currentSms.addNewJSONObject("", );
+                currentSms.addNewJSONObject(fieldName, smsField.smsFieldValue);
             }
 
             if (currentSmsOtherFields.length() > 0)
@@ -154,8 +154,9 @@ public class MainActivity extends AppCompatActivity {
             if (currentSmsFieldTypes.length() > 0)
                 currentSms.addNewJSONObject("field_types", currentSmsFieldTypes);
 
-            smsArray.put(currentSms.jsonObject);
-        } while(cursor.moveToNext());
+            smsArray.put(currentSms.getJsonObject());
+            smsCounter_zeroBased++;
+        }
     }
 
     private void processCurrentFieldType(Map<String, SmsFieldType> defaultFieldTypesMap,
@@ -185,7 +186,3 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 }
-
-//            ReaderWriter readerWriter = new ReaderWriter();
-//            String response = readerWriter.writeFileSD("sms_backup", "sms_backup_json.txt", data);
-//            Log.d(LOG_TAG, response);

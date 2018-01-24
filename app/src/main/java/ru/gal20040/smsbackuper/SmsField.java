@@ -13,20 +13,24 @@ class SmsField {
         this.smsFieldValue = smsFieldValue;
     }
 
-    static SmsField getSmsField(Cursor cursor, int fieldNumberZeroBased) {
-        switch (cursor.getType(fieldNumberZeroBased)) {
+    static SmsField getSmsField(Cursor cursor, int columnIndex) {
+        SmsField smsField;
+        switch (cursor.getType(columnIndex)) {
             case (Cursor.FIELD_TYPE_NULL):
                 return new SmsField(NULL, null);
             case (Cursor.FIELD_TYPE_STRING):
-                return new SmsField(STRING, cursor.getString(fieldNumberZeroBased));
+                return new SmsField(STRING, cursor.getString(columnIndex));
             case (Cursor.FIELD_TYPE_BLOB):
-                return new SmsField(BLOB, cursor.getBlob(fieldNumberZeroBased));
+                return new SmsField(BLOB, cursor.getBlob(columnIndex));
             case (Cursor.FIELD_TYPE_FLOAT):
-                return new SmsField(FLOAT, cursor.getDouble(fieldNumberZeroBased));
+                return new SmsField(FLOAT, cursor.getDouble(columnIndex));
             case (Cursor.FIELD_TYPE_INTEGER):
-                return new SmsField(INT, cursor.getLong(fieldNumberZeroBased));
+                smsField = new SmsField(INT, cursor.getLong(columnIndex));
+                return smsField;
             default:
-                return new SmsField(UNKNOWN_FIELD_TYPE, null);
+                //todo почему-то предыдущие case после того как полностью отработают перескакивают на этот case - строка с созданием нового SmsField не выполняется, выполняется только return - при этом метод возвращает корректные данные.
+                smsField = new SmsField(UNKNOWN_FIELD_TYPE, null);
+                return smsField;
         }
     }
 }
